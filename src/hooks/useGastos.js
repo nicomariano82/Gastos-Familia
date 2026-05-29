@@ -6,13 +6,12 @@ export function useGastos() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // ── Obtener gastos de un mes ────────────────────────────────────────────
   const getGastosMes = useCallback(async (year, month) => {
     setLoading(true);
     setError(null);
     try {
       const desde = `${year}-${String(month).padStart(2, '0')}-01`;
-      const hasta = new Date(year, month, 0); // último día del mes
+      const hasta = new Date(year, month, 0);
       const hastaStr = format(hasta, 'yyyy-MM-dd');
 
       const { data, error: err } = await supabase
@@ -37,7 +36,6 @@ export function useGastos() {
     }
   }, []);
 
-  // ── Crear gasto ─────────────────────────────────────────────────────────
   const crearGasto = useCallback(async (gastoData, userId) => {
     setLoading(true);
     setError(null);
@@ -45,14 +43,15 @@ export function useGastos() {
       const { data, error: err } = await supabase
         .from('gastos')
         .insert({
-          concepto: gastoData.concepto,
-          importe: parseFloat(gastoData.importe),
-          fecha: gastoData.fecha || format(new Date(), 'yyyy-MM-dd'),
-          comentario: gastoData.comentario || null,
+          concepto:     gastoData.concepto,
+          importe:      parseFloat(gastoData.importe),
+          fecha:        gastoData.fecha || format(new Date(), 'yyyy-MM-dd'),
+          comentario:   gastoData.comentario || null,
           categoria_id: gastoData.categoria_id || null,
-          usuario_id: userId,
+          usuario_id:   userId,
           metodo_carga: gastoData.metodo_carga || 'manual',
-          imagen_url: gastoData.imagen_url || null,
+          imagen_url:   gastoData.imagen_url || null,
+          medio_pago:   gastoData.medio_pago || 'efectivo',
         })
         .select(`
           *,
@@ -71,7 +70,6 @@ export function useGastos() {
     }
   }, []);
 
-  // ── Actualizar gasto ────────────────────────────────────────────────────
   const actualizarGasto = useCallback(async (id, updates) => {
     setLoading(true);
     setError(null);
@@ -97,16 +95,11 @@ export function useGastos() {
     }
   }, []);
 
-  // ── Borrar gasto ────────────────────────────────────────────────────────
   const borrarGasto = useCallback(async (id) => {
     setLoading(true);
     setError(null);
     try {
-      const { error: err } = await supabase
-        .from('gastos')
-        .delete()
-        .eq('id', id);
-
+      const { error: err } = await supabase.from('gastos').delete().eq('id', id);
       if (err) throw err;
       return true;
     } catch (e) {
@@ -117,37 +110,32 @@ export function useGastos() {
     }
   }, []);
 
-  // ── Obtener categorías ──────────────────────────────────────────────────
   const getCategorias = useCallback(async () => {
     const { data, error: err } = await supabase
       .from('categorias')
       .select('*')
       .order('nombre');
-
     if (err) throw err;
     return data || [];
   }, []);
 
-  // ── Crear categoría ─────────────────────────────────────────────────────
   const crearCategoria = useCallback(async (nombre, icono, color, userId) => {
     const { data, error: err } = await supabase
       .from('categorias')
       .insert({ nombre, icono: icono || '📌', color: color || '#94a3b8', es_personalizada: true, created_by: userId })
       .select()
       .single();
-
     if (err) throw err;
     return data;
   }, []);
 
-  // ── Exportar gastos a CSV ───────────────────────────────────────────────
   const exportarCSV = useCallback((gastos, nombreMes) => {
-    const headers = ['Fecha', 'Concepto', 'Categoría', 'Importe', 'Usuario', 'Comentario', 'Método'];
+    const headers = ['Fecha', 'Categoría', 'Importe', 'Medio de Pago', 'Usuario', 'Comentario', 'Método'];
     const rows = gastos.map(g => [
       g.fecha,
-      g.concepto,
       g.categorias?.nombre || '',
       g.importe,
+      g.medio_pago === 'digital' ? 'Digital' : 'Efectivo',
       g.profiles?.nombre || '',
       g.comentario || '',
       g.metodo_carga,
@@ -166,17 +154,11 @@ export function useGastos() {
     URL.revokeObjectURL(url);
   }, []);
 
-  // ── Subir imagen a Supabase Storage ────────────────────────────────────
   const subirImagen = useCallback(async (file, userId) => {
     const ext = file.name.split('.').pop();
     const path = `${userId}/${Date.now()}.${ext}`;
-
-    const { error: err } = await supabase.storage
-      .from('tickets')
-      .upload(path, file);
-
+    const { error: err } = await supabase.storage.from('tickets').upload(path, file);
     if (err) throw err;
-
     const { data } = supabase.storage.from('tickets').getPublicUrl(path);
     return data.publicUrl;
   }, []);
