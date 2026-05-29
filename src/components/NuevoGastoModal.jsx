@@ -6,8 +6,13 @@ import { analizarTicket, analizarAudio, fileToBase64 } from '../lib/openai';
 
 const METODOS = [
   { id: 'manual', label: 'Manual', emoji: '✏️' },
-  { id: 'foto', label: 'Foto', emoji: '📷' },
-  { id: 'audio', label: 'Audio', emoji: '🎤' },
+  { id: 'foto',   label: 'Foto',   emoji: '📷' },
+  { id: 'audio',  label: 'Audio',  emoji: '🎤' },
+];
+
+const MEDIOS_PAGO = [
+  { id: 'efectivo', label: 'Efectivo', emoji: '💵', color: '#10b981', bg: '#d1fae5', border: '#6ee7b7' },
+  { id: 'digital',  label: 'Digital',  emoji: '💳', color: '#4f46e5', bg: '#ede9fe', border: '#c4b5fd' },
 ];
 
 export default function NuevoGastoModal({ onClose, onGuardado }) {
@@ -20,13 +25,12 @@ export default function NuevoGastoModal({ onClose, onGuardado }) {
   const [procesando, setProcesando] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Form
   const [form, setForm] = useState({
-    concepto: '',
     importe: '',
     fecha: format(new Date(), 'yyyy-MM-dd'),
     comentario: '',
     categoria_id: '',
+    medio_pago: 'efectivo',
   });
 
   // Foto
@@ -48,6 +52,9 @@ export default function NuevoGastoModal({ onClose, onGuardado }) {
     getCategorias().then(setCategorias).catch(() => {});
   }, [getCategorias]);
 
+  // Nombre de la categoría seleccionada (se usa como concepto)
+  const categoriaSeleccionada = categorias.find(c => c.id === form.categoria_id);
+
   // ── Foto ───────────────────────────────────────────────────────────────
   const handleFoto = async (e) => {
     const file = e.target.files[0];
@@ -61,12 +68,11 @@ export default function NuevoGastoModal({ onClose, onGuardado }) {
       const resultado = await analizarTicket(b64, file.type);
       setForm(f => ({
         ...f,
-        concepto: resultado.concepto || f.concepto,
         importe: resultado.importe ? String(resultado.importe) : f.importe,
         fecha: resultado.fecha || f.fecha,
       }));
       setConfianzaFoto(resultado.confianza);
-    } catch (err) {
+    } catch {
       setErrorMsg('No se pudo leer el ticket. Completá los datos manualmente.');
     } finally {
       setProcesando(false);
@@ -103,7 +109,6 @@ export default function NuevoGastoModal({ onClose, onGuardado }) {
       setTranscripcion(resultado.transcripcion || '');
       setForm(f => ({
         ...f,
-        concepto: resultado.concepto || f.concepto,
         importe: resultado.importe ? String(resultado.importe) : f.importe,
         comentario: resultado.comentario || f.comentario,
       }));
@@ -125,7 +130,7 @@ export default function NuevoGastoModal({ onClose, onGuardado }) {
   // ── Guardar ────────────────────────────────────────────────────────────
   const handleGuardar = async () => {
     setErrorMsg('');
-    if (!form.concepto.trim()) { setErrorMsg('Ingresá el concepto del gasto'); return; }
+    if (!form.categoria_id) { setErrorMsg('Seleccioná una categoría'); return; }
     if (!form.importe || isNaN(Number(form.importe))) { setErrorMsg('Ingresá un importe válido'); return; }
 
     setGuardando(true);
@@ -134,7 +139,13 @@ export default function NuevoGastoModal({ onClose, onGuardado }) {
       if (imagenFile) {
         imagen_url = await subirImagen(imagenFile, user.id).catch(() => null);
       }
-      await crearGasto({ ...form, imagen_url, metodo_carga: metodo }, user.id);
+      // El concepto se toma automáticamente del nombre de la categoría
+      await crearGasto({
+        ...form,
+        concepto: categoriaSeleccionada?.nombre || 'Sin categoría',
+        imagen_url,
+        metodo_carga: metodo,
+      }, user.id);
       onGuardado();
     } catch (err) {
       setErrorMsg(err.message || 'Error al guardar el gasto');
@@ -157,21 +168,19 @@ export default function NuevoGastoModal({ onClose, onGuardado }) {
     }
   };
 
-  // ── Sugerencias de concepto ────────────────────────────────────────────
-  const conceptosSugeridos = categorias
-    .filter(c => c.nombre.toLowerCase().includes(form.concepto.toLowerCase()) && form.concepto.length > 1)
-    .slice(0, 4);
+  const medioPagoActual = MEDIOS_PAGO.find(m => m.id === form.medio_pago);
 
   return (
     <div style={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={styles.modal}>
+
         {/* Header */}
         <div style={styles.modalHeader}>
           <h2 style={styles.modalTitle}>Nuevo Gasto</h2>
           <button style={styles.closeBtn} onClick={onClose}>✕</button>
         </div>
 
-        {/* Método */}
+        {/* Método de carga */}
         <div style={styles.metodoRow}>
           {METODOS.map(m => (
             <button
@@ -186,6 +195,7 @@ export default function NuevoGastoModal({ onClose, onGuardado }) {
         </div>
 
         <div style={styles.scroll}>
+
           {/* ── FOTO ─────────────────────────────────────────────────── */}
           {metodo === 'foto' && (
             <div style={styles.section}>
@@ -204,9 +214,9 @@ export default function NuevoGastoModal({ onClose, onGuardado }) {
               {procesando && <p style={styles.procesando}>🤖 Analizando imagen con IA...</p>}
               {confianzaFoto && !procesando && (
                 <p style={styles.confianza}>
-                  {confianzaFoto === 'alta' ? '✅ Datos leídos correctamente. Revisalos antes de guardar.' :
-                    confianzaFoto === 'media' ? '⚠️ Datos leídos con dudas. Verificá antes de guardar.' :
-                      '❌ No se pudo leer bien. Completá los datos manualmente.'}
+                  {confianzaFoto === 'alta' ? '✅ Importe leído. Revisá antes de guardar.' :
+                    confianzaFoto === 'media' ? '⚠️ Leído con dudas. Verificá el importe.' :
+                      '❌ No se pudo leer bien. Completá el importe manualmente.'}
                 </p>
               )}
             </div>
@@ -242,45 +252,37 @@ export default function NuevoGastoModal({ onClose, onGuardado }) {
             </div>
           )}
 
-          {/* ── FORMULARIO (siempre visible) ──────────────────────────── */}
+          {/* ── FORMULARIO ───────────────────────────────────────────── */}
           <div style={styles.section}>
-            <label style={styles.label}>Concepto *</label>
-            <input
-              style={styles.input}
-              placeholder="Ej: Supermercado, Farmacia..."
-              value={form.concepto}
-              onChange={e => setForm({ ...form, concepto: e.target.value })}
-            />
-            {/* Sugerencias */}
-            {conceptosSugeridos.length > 0 && (
-              <div style={styles.suggestions}>
-                {conceptosSugeridos.map(c => (
-                  <button key={c.id} style={styles.suggestion} onClick={() => setForm({ ...form, concepto: c.nombre, categoria_id: c.id })}>
-                    {c.icono} {c.nombre}
+
+            {/* MEDIO DE PAGO — botones grandes */}
+            <label style={styles.label}>Medio de pago *</label>
+            <div style={styles.medioPagoRow}>
+              {MEDIOS_PAGO.map(mp => {
+                const activo = form.medio_pago === mp.id;
+                return (
+                  <button
+                    key={mp.id}
+                    style={{
+                      ...styles.medioPagoBtn,
+                      background: activo ? mp.bg : 'white',
+                      border: `2px solid ${activo ? mp.border : '#e2e8f0'}`,
+                      color: activo ? mp.color : '#94a3b8',
+                    }}
+                    onClick={() => setForm({ ...form, medio_pago: mp.id })}
+                  >
+                    <span style={styles.medioPagoEmoji}>{mp.emoji}</span>
+                    <span style={{ ...styles.medioPagoLabel, color: activo ? mp.color : '#64748b', fontWeight: activo ? '800' : '600' }}>
+                      {mp.label}
+                    </span>
+                    {activo && <span style={{ ...styles.medioPagoCheck, color: mp.color }}>✓</span>}
                   </button>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
 
-            <label style={styles.label}>Importe *</label>
-            <input
-              style={styles.input}
-              type="number"
-              inputMode="decimal"
-              placeholder="0"
-              value={form.importe}
-              onChange={e => setForm({ ...form, importe: e.target.value })}
-            />
-
-            <label style={styles.label}>Fecha</label>
-            <input
-              style={styles.input}
-              type="date"
-              value={form.fecha}
-              onChange={e => setForm({ ...form, fecha: e.target.value })}
-            />
-
-            <label style={styles.label}>Categoría</label>
+            {/* CATEGORÍA */}
+            <label style={styles.label}>Categoría *</label>
             <select
               style={styles.select}
               value={form.categoria_id}
@@ -289,7 +291,7 @@ export default function NuevoGastoModal({ onClose, onGuardado }) {
                 else setForm({ ...form, categoria_id: e.target.value });
               }}
             >
-              <option value="">Sin categoría</option>
+              <option value="">Elegí una categoría...</option>
               {categorias.map(c => (
                 <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
               ))}
@@ -300,7 +302,7 @@ export default function NuevoGastoModal({ onClose, onGuardado }) {
               <div style={styles.nuevaCatRow}>
                 <input
                   style={{ ...styles.input, flex: 1, margin: 0 }}
-                  placeholder="Nombre de la categoría"
+                  placeholder="Nombre de la nueva categoría"
                   value={nuevaCat}
                   onChange={e => setNuevaCat(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && agregarCategoria()}
@@ -309,6 +311,27 @@ export default function NuevoGastoModal({ onClose, onGuardado }) {
               </div>
             )}
 
+            {/* IMPORTE */}
+            <label style={styles.label}>Importe *</label>
+            <input
+              style={styles.input}
+              type="number"
+              inputMode="decimal"
+              placeholder="0"
+              value={form.importe}
+              onChange={e => setForm({ ...form, importe: e.target.value })}
+            />
+
+            {/* FECHA */}
+            <label style={styles.label}>Fecha</label>
+            <input
+              style={styles.input}
+              type="date"
+              value={form.fecha}
+              onChange={e => setForm({ ...form, fecha: e.target.value })}
+            />
+
+            {/* COMENTARIO */}
             <label style={styles.label}>Comentario (opcional)</label>
             <input
               style={styles.input}
@@ -317,6 +340,20 @@ export default function NuevoGastoModal({ onClose, onGuardado }) {
               onChange={e => setForm({ ...form, comentario: e.target.value })}
             />
           </div>
+
+          {/* Preview de lo que se va a guardar */}
+          {form.categoria_id && form.importe && (
+            <div style={{ ...styles.previewGasto, borderColor: medioPagoActual?.border }}>
+              <span style={{ fontSize: '20px' }}>{categoriaSeleccionada?.icono}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: '700', fontSize: '14px', color: '#1e293b' }}>{categoriaSeleccionada?.nombre}</div>
+                <div style={{ fontSize: '12px', color: '#64748b' }}>{medioPagoActual?.emoji} {medioPagoActual?.label}</div>
+              </div>
+              <div style={{ fontWeight: '800', fontSize: '16px', color: '#1e293b' }}>
+                ${Number(form.importe).toLocaleString('es-AR')}
+              </div>
+            </div>
+          )}
 
           {errorMsg && <div style={styles.error}>{errorMsg}</div>}
         </div>
@@ -354,7 +391,7 @@ const styles = {
     background: '#f1f5f9', border: 'none', borderRadius: '50%',
     width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px', fontWeight: '700',
   },
-  metodoRow: { display: 'flex', gap: '8px', padding: '14px 20px' },
+  metodoRow: { display: 'flex', gap: '8px', padding: '14px 20px 0' },
   metodoBtn: {
     flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px',
     padding: '10px 6px', borderRadius: '14px', border: '2px solid #e2e8f0',
@@ -365,7 +402,21 @@ const styles = {
   metodoLabel: { fontSize: '11px', fontWeight: '700', color: '#475569' },
   scroll: { flex: 1, overflowY: 'auto', padding: '0 20px' },
   section: { marginBottom: '12px' },
-  label: { display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', margin: '10px 0 4px', textTransform: 'uppercase', letterSpacing: '0.5px' },
+  label: {
+    display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569',
+    margin: '14px 0 6px', textTransform: 'uppercase', letterSpacing: '0.5px',
+  },
+  // Medio de pago
+  medioPagoRow: { display: 'flex', gap: '12px' },
+  medioPagoBtn: {
+    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
+    padding: '16px 8px', borderRadius: '16px', cursor: 'pointer',
+    fontFamily: 'inherit', position: 'relative', transition: 'all 0.15s',
+  },
+  medioPagoEmoji: { fontSize: '32px' },
+  medioPagoLabel: { fontSize: '15px' },
+  medioPagoCheck: { position: 'absolute', top: '8px', right: '10px', fontSize: '14px', fontWeight: '900' },
+  // Categoría y form
   input: {
     width: '100%', padding: '12px 14px', borderRadius: '12px',
     border: '2px solid #e5e7eb', fontSize: '15px', outline: 'none',
@@ -376,17 +427,19 @@ const styles = {
     border: '2px solid #e5e7eb', fontSize: '15px', outline: 'none',
     boxSizing: 'border-box', fontFamily: 'inherit', background: 'white',
   },
-  suggestions: { display: 'flex', gap: '6px', flexWrap: 'wrap', margin: '6px 0' },
-  suggestion: {
-    padding: '4px 10px', borderRadius: '20px', border: '1px solid #e2e8f0',
-    background: '#f8fafc', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit',
-  },
   nuevaCatRow: { display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center' },
   addCatBtn: {
     padding: '12px 16px', background: '#4f46e5', color: 'white',
-    border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontFamily: 'inherit',
-    whiteSpace: 'nowrap',
+    border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: '700',
+    fontFamily: 'inherit', whiteSpace: 'nowrap',
   },
+  // Preview
+  previewGasto: {
+    display: 'flex', alignItems: 'center', gap: '12px',
+    padding: '12px 14px', borderRadius: '14px', border: '2px solid',
+    background: '#f8fafc', marginBottom: '10px',
+  },
+  // Foto y audio
   uploadZone: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
     padding: '28px', borderRadius: '16px', border: '2px dashed #c7d2fe',
@@ -401,7 +454,10 @@ const styles = {
     borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer', fontSize: '13px',
   },
   procesando: { textAlign: 'center', color: '#6366f1', fontSize: '14px', margin: '8px 0' },
-  confianza: { fontSize: '13px', color: '#475569', padding: '8px 12px', background: '#f8fafc', borderRadius: '10px', margin: '6px 0' },
+  confianza: {
+    fontSize: '13px', color: '#475569', padding: '8px 12px',
+    background: '#f8fafc', borderRadius: '10px', margin: '6px 0',
+  },
   audioZone: { display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap', padding: '16px 0' },
   recBtn: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
@@ -411,7 +467,7 @@ const styles = {
   stopBtn: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px',
     padding: '16px 24px', background: '#fef3c7', border: '2px solid #fcd34d',
-    borderRadius: '16px', cursor: 'pointer', fontFamily: 'inherit', animation: 'pulse 1s infinite',
+    borderRadius: '16px', cursor: 'pointer', fontFamily: 'inherit',
   },
   audioFileLabel: {
     display: 'flex', alignItems: 'center', gap: '6px',
