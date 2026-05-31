@@ -7,6 +7,7 @@ import NuevoGastoModal from '../components/NuevoGastoModal';
 import GastoItem from '../components/GastoItem';
 import ResumenCategoria from '../components/ResumenCategoria';
 import SelectorMes from '../components/SelectorMes';
+import CategoriasPage from './CategoriasPage';
 
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
@@ -18,6 +19,7 @@ export default function Dashboard() {
   const [mostrarModal, setMostrarModal] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [tab, setTab] = useState('resumen');
+  const [verCategorias, setVerCategorias] = useState(false);
 
   const cargarGastos = useCallback(async () => {
     setCargando(true);
@@ -59,6 +61,10 @@ export default function Dashboard() {
   const esMesActual    = mes.year === hoy.getFullYear() && mes.month === hoy.getMonth() + 1;
   const nombreMes      = format(new Date(mes.year, mes.month - 1, 1), 'MMMM yyyy', { locale: es });
 
+  if (verCategorias) {
+    return <CategoriasPage onVolver={() => setVerCategorias(false)} />;
+  }
+
   return (
     <div style={styles.page}>
 
@@ -70,6 +76,7 @@ export default function Dashboard() {
             <p style={styles.headerSub}>Hola, <strong>{profile?.nombre}</strong> 👋</p>
           </div>
           <div style={styles.headerActions}>
+            <button style={styles.iconBtn} onClick={() => setVerCategorias(true)} title="Categorías">🏷️</button>
             <button style={styles.iconBtn} onClick={() => exportarCSV(gastos, nombreMes)} title="Exportar CSV">📊</button>
             <button style={styles.iconBtn} onClick={signOut} title="Cerrar sesión">🚪</button>
           </div>
