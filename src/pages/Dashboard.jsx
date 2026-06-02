@@ -8,6 +8,7 @@ import GastoItem from '../components/GastoItem';
 import ResumenCategoria from '../components/ResumenCategoria';
 import SelectorMes from '../components/SelectorMes';
 import CategoriasPage from './CategoriasPage';
+import IngresosPage from './IngresosPage';
 
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
@@ -20,6 +21,7 @@ export default function Dashboard() {
   const [cargando, setCargando] = useState(true);
   const [tab, setTab] = useState('resumen');
   const [verCategorias, setVerCategorias] = useState(false);
+  const [verIngresos, setVerIngresos]     = useState(false);
 
   const cargarGastos = useCallback(async () => {
     setCargando(true);
@@ -65,6 +67,10 @@ export default function Dashboard() {
     return <CategoriasPage onVolver={() => setVerCategorias(false)} />;
   }
 
+  if (verIngresos) {
+    return <IngresosPage onVolver={() => setVerIngresos(false)} />;
+  }
+
   return (
     <div style={styles.page}>
 
@@ -76,7 +82,8 @@ export default function Dashboard() {
             <p style={styles.headerSub}>Hola, <strong>{profile?.nombre}</strong> 👋</p>
           </div>
           <div style={styles.headerActions}>
-            <button style={styles.iconBtn} onClick={() => setVerCategorias(true)} title="Categorías">🏷️</button>
+            <button style={styles.iconBtn} onClick={() => setVerIngresos(true)}    title="Ingresos">💚</button>
+            <button style={styles.iconBtn} onClick={() => setVerCategorias(true)}  title="Categorías">🏷️</button>
             <button style={styles.iconBtn} onClick={() => exportarCSV(gastos, nombreMes)} title="Exportar CSV">📊</button>
             <button style={styles.iconBtn} onClick={signOut} title="Cerrar sesión">🚪</button>
           </div>
@@ -137,6 +144,18 @@ export default function Dashboard() {
         </div>
 
       </div>
+
+      {/* ── Acceso rápido Ingresos ────────────────────────────────────── */}
+      <button style={styles.ingresosCard} onClick={() => setVerIngresos(true)}>
+        <div style={styles.ingresosCardLeft}>
+          <span style={styles.ingresosCardEmoji}>💚</span>
+          <div>
+            <div style={styles.ingresosCardTitle}>Ingresos familiares</div>
+            <div style={styles.ingresosCardSub}>Ver ingresos en dólares del mes</div>
+          </div>
+        </div>
+        <span style={styles.ingresosCardArrow}>›</span>
+      </button>
 
       {/* ── Tabs ─────────────────────────────────────────────────────── */}
       <div style={styles.tabs}>
@@ -256,6 +275,19 @@ const styles = {
   miniBarBg: { height: '6px', background: '#f1f5f9', borderRadius: '99px', overflow: 'hidden', marginBottom: '6px' },
   miniBarFill: { height: '100%', borderRadius: '99px', transition: 'width 0.5s ease' },
   medioPagoCardPct: { margin: 0, fontSize: '11px', color: '#94a3b8', fontWeight: '600' },
+  // Tarjeta acceso ingresos
+  ingresosCard: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    background: 'white', margin: '0 16px 12px', borderRadius: '16px',
+    padding: '14px 16px', border: '2px solid #a7f3d0',
+    cursor: 'pointer', width: 'calc(100% - 32px)', boxSizing: 'border-box',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.05)', fontFamily: 'inherit',
+  },
+  ingresosCardLeft: { display: 'flex', alignItems: 'center', gap: '12px' },
+  ingresosCardEmoji: { fontSize: '28px' },
+  ingresosCardTitle: { fontSize: '15px', fontWeight: '800', color: '#065f46' },
+  ingresosCardSub: { fontSize: '12px', color: '#6ee7b7', marginTop: '2px', fontWeight: '600' },
+  ingresosCardArrow: { fontSize: '24px', color: '#10b981', fontWeight: '700' },
   // Tabs
   tabs: { display: 'flex', margin: '0 16px 12px', gap: '8px' },
   tabBtn: {
