@@ -9,6 +9,7 @@ import ResumenCategoria from '../components/ResumenCategoria';
 import SelectorMes from '../components/SelectorMes';
 import CategoriasPage from './CategoriasPage';
 import IngresosPage from './IngresosPage';
+import ListaComprasPage from './ListaComprasPage';
 
 export default function Dashboard() {
   const { profile, signOut } = useAuth();
@@ -20,8 +21,9 @@ export default function Dashboard() {
   const [mostrarModal, setMostrarModal] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [tab, setTab] = useState('resumen');
-  const [verCategorias, setVerCategorias] = useState(false);
-  const [verIngresos, setVerIngresos]     = useState(false);
+  const [verCategorias, setVerCategorias]     = useState(false);
+  const [verIngresos, setVerIngresos]         = useState(false);
+  const [verListaCompras, setVerListaCompras] = useState(false);
 
   const cargarGastos = useCallback(async () => {
     setCargando(true);
@@ -69,6 +71,13 @@ export default function Dashboard() {
 
   if (verIngresos) {
     return <IngresosPage onVolver={() => setVerIngresos(false)} />;
+  }
+
+  if (verListaCompras) {
+    return <ListaComprasPage
+      onVolver={() => setVerListaCompras(false)}
+      onRegistrarGasto={() => { setVerListaCompras(false); setMostrarModal(true); }}
+    />;
   }
 
   return (
@@ -155,6 +164,18 @@ export default function Dashboard() {
           </div>
         </div>
         <span style={styles.ingresosCardArrow}>›</span>
+      </button>
+
+      {/* ── Acceso rápido Lista de compras ───────────────────────────── */}
+      <button style={styles.listaComprasCard} onClick={() => setVerListaCompras(true)}>
+        <div style={styles.ingresosCardLeft}>
+          <span style={styles.ingresosCardEmoji}>🛒</span>
+          <div>
+            <div style={styles.listaComprasCardTitle}>Lista de compras</div>
+            <div style={styles.listaComprasCardSub}>Armá la lista antes de ir al super</div>
+          </div>
+        </div>
+        <span style={styles.listaComprasCardArrow}>›</span>
       </button>
 
       {/* ── Tabs ─────────────────────────────────────────────────────── */}
@@ -275,6 +296,17 @@ const styles = {
   miniBarBg: { height: '6px', background: '#f1f5f9', borderRadius: '99px', overflow: 'hidden', marginBottom: '6px' },
   miniBarFill: { height: '100%', borderRadius: '99px', transition: 'width 0.5s ease' },
   medioPagoCardPct: { margin: 0, fontSize: '11px', color: '#94a3b8', fontWeight: '600' },
+  // Tarjeta acceso lista de compras
+  listaComprasCard: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    background: 'white', margin: '0 16px 12px', borderRadius: '16px',
+    padding: '14px 16px', border: '2px solid #bfdbfe',
+    cursor: 'pointer', width: 'calc(100% - 32px)', boxSizing: 'border-box',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.05)', fontFamily: 'inherit',
+  },
+  listaComprasCardTitle: { fontSize: '15px', fontWeight: '800', color: '#1e3a8a' },
+  listaComprasCardSub:   { fontSize: '12px', color: '#93c5fd', marginTop: '2px', fontWeight: '600' },
+  listaComprasCardArrow: { fontSize: '24px', color: '#3b82f6', fontWeight: '700' },
   // Tarjeta acceso ingresos
   ingresosCard: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
