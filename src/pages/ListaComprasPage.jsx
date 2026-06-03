@@ -10,8 +10,9 @@ import { useListaCompras } from '../hooks/useListaCompras';
 export default function ListaComprasPage({ onVolver, onRegistrarGasto }) {
   const { user } = useAuth();
   const hook = useListaCompras();
+  const { getListaActiva, getHistorial, crearLista, finalizarLista } = hook;
 
-  const [vista, setVista] = useState('main'); // main | lista | historial | rubros
+  const [vista, setVista] = useState('main');
   const [listaActiva, setListaActiva] = useState(null);
   const [historial, setHistorial]     = useState([]);
   const [cargando, setCargando]       = useState(true);
@@ -22,19 +23,19 @@ export default function ListaComprasPage({ onVolver, onRegistrarGasto }) {
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      const [activa, hist] = await Promise.all([hook.getListaActiva(), hook.getHistorial()]);
+      const [activa, hist] = await Promise.all([getListaActiva(), getHistorial()]);
       setListaActiva(activa);
       setHistorial(hist);
     } catch (e) { setError(e.message); }
     finally { setCargando(false); }
-  }, [hook]);
+  }, [getListaActiva, getHistorial]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
   const crearNueva = async () => {
     if (!nombreNueva.trim()) { setError('Escribí un nombre para la lista'); return; }
     try {
-      const lista = await hook.crearLista(nombreNueva.trim(), user.id);
+      const lista = await crearLista(nombreNueva.trim(), user.id);
       setListaActiva({ ...lista, items_lista: [] });
       setNombreNueva('');
       setMostrarNombreForm(false);
@@ -44,7 +45,7 @@ export default function ListaComprasPage({ onVolver, onRegistrarGasto }) {
 
   const finalizar = async () => {
     if (!listaActiva) return;
-    await hook.finalizarLista(listaActiva.id);
+    await finalizarLista(listaActiva.id);
     await cargar();
     setVista('main');
   };
@@ -174,6 +175,8 @@ export default function ListaComprasPage({ onVolver, onRegistrarGasto }) {
 // VISTA LISTA — La lista activa con productos y checkboxes
 // ─────────────────────────────────────────────────────────────────────────────
 function VistaLista({ lista, hook, user, onVolver, onFinalizar, onRegistrarGasto }) {
+  const { getRubros, getProductos, agregarItem, toggleComprado, editarItem, borrarItem, limpiarComprados } = hook;
+
   const [items, setItems]           = useState(lista.items_lista || []);
   const [rubros, setRubros]         = useState([]);
   const [rubroSel, setRubroSel]     = useState(null);
@@ -188,15 +191,15 @@ function VistaLista({ lista, hook, user, onVolver, onFinalizar, onRegistrarGasto
   const [mostrarFinalizarModal, setMostrarFinalizarModal] = useState(false);
   const busquedaRef = useRef(null);
 
-  const totalItems    = items.length;
+  const totalItems     = items.length;
   const totalComprados = items.filter(i => i.comprado).length;
   const pct = totalItems > 0 ? Math.round((totalComprados / totalItems) * 100) : 0;
 
-  useEffect(() => { hook.getRubros().then(setRubros); }, [hook]);
+  useEffect(() => { getRubros().then(setRubros); }, [getRubros]);
 
   useEffect(() => {
-    if (rubroSel) hook.getProductos(rubroSel.id).then(setProductos);
-  }, [rubroSel, hook]);
+    if (rubroSel) getProductos(rubroSel.id).then(setProductos);
+  }, [rubroSel, getProductos]);
 
   const gruposRubro = agruparPorRubro(items);
   const productosFiltrados = productos.filter(p =>
@@ -212,7 +215,7 @@ function VistaLista({ lista, hook, user, onVolver, onFinalizar, onRegistrarGasto
     setGuardando(true);
     setError('');
     try {
-      const item = await hook.agregarItem(lista.id, rubroSel.id, nombre, qty || cantidad);
+      const item = await agregarItem(lista.id, rubroSel.id, nombre, qty || cantidad);
       setItems(prev => [...prev, { ...item, rubros_compra: rubroSel }]);
       setCantidad('');
       setBusqueda('');
@@ -229,24 +232,28 @@ function VistaLista({ lista, hook, user, onVolver, onFinalizar, onRegistrarGasto
   const toggle = async (item) => {
     const nuevo = !item.comprado;
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, comprado: nuevo } : i));
-    await hook.toggleComprado(item.id, nuevo, user.id);
+    await toggleComprado(item.id, nuevo, user.id);
   };
 
-  const borrarItem = async (itemId) => {
+  const borrarItemLocal = async (itemId) => {
     setItems(prev => prev.filter(i => i.id !== itemId));
-    await hook.borrarItem(itemId);
+    await borrarItem(itemId);
   };
 
   const guardarEdicion = async (item, nuevoNombreE, nuevaCantidadE) => {
     setItems(prev => prev.map(i => i.id === item.id
       ? { ...i, nombre_item: nuevoNombreE, cantidad: nuevaCantidadE || null } : i));
-    await hook.editarItem(item.id, nuevoNombreE, nuevaCantidadE);
+    await editarItem(item.id, nuevoNombreE, nuevaCantidadE);
     setEditandoItem(null);
   };
 
-  const limpiarComprados = async () => {
-    await hook.limpiarComprados(lista.id);
+  const limpiarCompradosLocal = async () => {
+    await limpiarComprados(lista.id);
     setItems(prev => prev.filter(i => !i.comprado));
+  };
+    const nuevo = !item.comprado;
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, comprado: nuevo } : i));
+    await toggleComprado(item.id, nuevo, user.id);
   };
 
   return (
@@ -352,7 +359,7 @@ function VistaLista({ lista, hook, user, onVolver, onFinalizar, onRegistrarGasto
         ) : (
           <>
             {totalComprados > 0 && (
-              <button style={s.limpiarBtn} onClick={limpiarComprados}>
+              <button style={s.limpiarBtn} onClick={limpiarCompradosLocal}>
                 🗑️ Quitar {totalComprados} comprado{totalComprados !== 1 ? 's' : ''}
               </button>
             )}
@@ -370,7 +377,7 @@ function VistaLista({ lista, hook, user, onVolver, onFinalizar, onRegistrarGasto
                 {grupo.items.map(item => (
                   <ItemRow key={item.id} item={item}
                     onToggle={() => toggle(item)}
-                    onBorrar={() => borrarItem(item.id)}
+                    onBorrar={() => borrarItemLocal(item.id)}
                     onEditar={(n, c) => guardarEdicion(item, n, c)}
                     editando={editandoItem?.id === item.id}
                     setEditando={() => setEditandoItem(editandoItem?.id === item.id ? null : item)} />
@@ -473,11 +480,12 @@ function ModalFinalizar({ lista, items, onCancelar, onFinalizar, onRegistrarGast
 // VISTA HISTORIAL
 // ─────────────────────────────────────────────────────────────────────────────
 function VistaHistorial({ historial, hook, onVolver, onRecargado }) {
+  const { borrarLista } = hook;
   const [confirmBorrar, setConfirmBorrar] = useState(null);
 
   const borrar = async (id) => {
     if (confirmBorrar !== id) { setConfirmBorrar(id); return; }
-    await hook.borrarLista(id);
+    await borrarLista(id);
     setConfirmBorrar(null);
     onRecargado();
   };
@@ -526,6 +534,9 @@ function VistaHistorial({ historial, hook, onVolver, onRecargado }) {
 // VISTA RUBROS — Gestionar rubros y sus productos
 // ─────────────────────────────────────────────────────────────────────────────
 function VistaRubros({ hook, onVolver }) {
+  const { getRubros, getProductos, crearRubro, editarRubro, borrarRubro: borrarRubroHook,
+          crearProducto, editarProducto, borrarProducto: borrarProductoHook } = hook;
+
   const [rubros, setRubros]         = useState([]);
   const [rubroSel, setRubroSel]     = useState(null);
   const [productos, setProductos]   = useState([]);
@@ -542,47 +553,47 @@ function VistaRubros({ hook, onVolver }) {
   const ICONOS_RUBRO  = ['🛒','🥬','🥩','🍗','💊','🍞','🧹','🐟','🧀','🥚','🍷','🧃','🌿'];
   const COLORES_RUBRO = ['#6366f1','#22c55e','#ef4444','#f97316','#3b82f6','#f59e0b','#06b6d4','#ec4899','#8b5cf6'];
 
-  const cargarRubros   = useCallback(async () => { const r = await hook.getRubros(); setRubros(r); }, [hook]);
-  const cargarProductos = useCallback(async (rId) => { const p = await hook.getProductos(rId); setProductos(p); }, [hook]);
+  const cargarRubros    = useCallback(async () => { const r = await getRubros(); setRubros(r); }, [getRubros]);
+  const cargarProductos = useCallback(async (rId) => { const p = await getProductos(rId); setProductos(p); }, [getProductos]);
 
   useEffect(() => { cargarRubros(); }, [cargarRubros]);
   useEffect(() => { if (rubroSel) cargarProductos(rubroSel.id); }, [rubroSel, cargarProductos]);
 
-  const abrirNuevoRubro = () => { setMostrarFormRubro(true); setEditandoRubro(null); setForm({ nombre: '', icono: '🛒', color: '#6366f1' }); };
+  const abrirNuevoRubro  = () => { setMostrarFormRubro(true); setEditandoRubro(null); setForm({ nombre: '', icono: '🛒', color: '#6366f1' }); };
   const abrirEditarRubro = (r) => { setMostrarFormRubro(true); setEditandoRubro(r); setForm({ nombre: r.nombre, icono: r.icono, color: r.color }); };
-  const cerrarFormRubro = () => { setMostrarFormRubro(false); setEditandoRubro(null); setError(''); };
+  const cerrarFormRubro  = () => { setMostrarFormRubro(false); setEditandoRubro(null); setError(''); };
 
   const guardarRubro = async () => {
     if (!form.nombre.trim()) { setError('Ingresá un nombre'); return; }
     try {
-      if (editandoRubro) { await hook.editarRubro(editandoRubro.id, form); }
-      else { await hook.crearRubro(form.nombre, form.icono, form.color); }
+      if (editandoRubro) { await editarRubro(editandoRubro.id, form); }
+      else { await crearRubro(form.nombre, form.icono, form.color); }
       await cargarRubros(); cerrarFormRubro();
     } catch (e) { setError(e.message); }
   };
 
   const borrarRubro = async (id) => {
     if (confirmBorrarRubro !== id) { setConfirmBorrarRubro(id); return; }
-    try { await hook.borrarRubro(id); setConfirmBorrarRubro(null); await cargarRubros(); if (rubroSel?.id === id) setRubroSel(null); }
+    try { await borrarRubroHook(id); setConfirmBorrarRubro(null); await cargarRubros(); if (rubroSel?.id === id) setRubroSel(null); }
     catch { setError('No se puede borrar: tiene productos asociados'); setConfirmBorrarRubro(null); }
   };
 
   const agregarProducto = async () => {
     if (!nuevoProducto.trim()) return;
     if (productos.find(p => p.nombre.toLowerCase() === nuevoProducto.toLowerCase())) { setError(`"${nuevoProducto}" ya existe en este rubro`); return; }
-    await hook.crearProducto(nuevoProducto.trim(), rubroSel.id);
+    await crearProducto(nuevoProducto.trim(), rubroSel.id);
     setNuevoProducto(''); await cargarProductos(rubroSel.id);
   };
 
   const guardarEdicionProducto = async (id) => {
     if (!editNombreProd.trim()) return;
-    await hook.editarProducto(id, editNombreProd.trim());
+    await editarProducto(id, editNombreProd.trim());
     setEditandoProducto(null); await cargarProductos(rubroSel.id);
   };
 
   const borrarProducto = async (id) => {
     if (confirmBorrarProd !== id) { setConfirmBorrarProd(id); return; }
-    await hook.borrarProducto(id); setConfirmBorrarProd(null); await cargarProductos(rubroSel.id);
+    await borrarProductoHook(id); setConfirmBorrarProd(null); await cargarProductos(rubroSel.id);
   };
 
   return (
