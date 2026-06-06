@@ -3,17 +3,82 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+
+    <!-- PWA Meta tags -->
     <meta name="theme-color" content="#4f46e5" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Gastos Familia" />
+    <meta name="apple-mobile-web-app-title" content="Gastos" />
+    <meta name="application-name" content="Gastos Familia" />
+    <meta name="description" content="Control de gastos familiares mensuales" />
+    <meta name="msapplication-TileColor" content="#4f46e5" />
+    <meta name="msapplication-TileImage" content="/icons/icon-144.png" />
+
+    <!-- Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Íconos -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png" />
+
     <title>💰 Gastos Familia</title>
+
+    <!-- Fuente -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+      /* Splash screen mientras carga */
+      #splash {
+        position: fixed; inset: 0;
+        background: linear-gradient(135deg, #1e1b4b 0%, #4f46e5 100%);
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        z-index: 9999; transition: opacity 0.4s ease;
+        font-family: 'Nunito', sans-serif; color: white;
+      }
+      #splash.hidden { opacity: 0; pointer-events: none; }
+      #splash-icon { font-size: 72px; margin-bottom: 16px; animation: pulse 1.5s infinite; }
+      #splash-title { font-size: 28px; font-weight: 800; margin: 0 0 8px; }
+      #splash-sub { font-size: 14px; opacity: 0.7; margin: 0; }
+      @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.08)} }
+    </style>
   </head>
   <body>
     <noscript>Esta aplicación requiere JavaScript.</noscript>
+
+    <!-- Splash screen -->
+    <div id="splash">
+      <div id="splash-icon">💰</div>
+      <p id="splash-title">Gastos Familia</p>
+      <p id="splash-sub">Cargando...</p>
+    </div>
+
     <div id="root"></div>
+
+    <!-- Registrar Service Worker -->
+    <script>
+      // Ocultar splash cuando React termina de cargar
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const splash = document.getElementById('splash');
+          if (splash) splash.classList.add('hidden');
+          setTimeout(() => { if (splash) splash.remove(); }, 400);
+        }, 800);
+      });
+
+      // Registrar SW
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('✅ SW registrado:', reg.scope))
+            .catch(err => console.log('❌ SW error:', err));
+        });
+      }
+    </script>
   </body>
 </html>
